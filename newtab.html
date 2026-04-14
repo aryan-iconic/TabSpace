@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>New Tab</title>
+  <style>
+    /* ===== CRITICAL CSS — INLINE FOR ZERO DELAY ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --glass-bg: rgba(10, 10, 20, 0.55);
+      --glass-border: rgba(255,255,255,0.10);
+      --glass-blur: 18px;
+      --accent: #e040fb;
+      --accent2: #ff4081;
+      --text: #f0f0f5;
+      --text-muted: rgba(240,240,245,0.55);
+      --radius: 16px;
+      --transition: 0.22s cubic-bezier(.4,0,.2,1);
+      --widget-min-w: 180px;
+      --widget-min-h: 80px;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0a0a14;
+      color: var(--text);
+      font-family: 'Syne', 'Segoe UI', sans-serif;
+      user-select: none;
+    }
+
+    /* Background layers */
+    #bg-layer {
+      position: fixed; inset: 0; z-index: 0;
+      background: #0a0a14;
+      transition: opacity 0.5s;
+    }
+    #bg-layer img, #bg-layer video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    #bg-overlay {
+      position: fixed; inset: 0; z-index: 1;
+      background: rgba(0,0,0,0.28);
+      pointer-events: none;
+    }
+
+    /* Desktop canvas */
+    #desktop {
+      position: fixed; inset: 0; z-index: 10;
+      overflow: hidden;
+    }
+
+    /* ===== WIDGETS ===== */
+    .widget {
+      position: absolute;
+      min-width: var(--widget-min-w);
+      min-height: var(--widget-min-h);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: default;
+      transition: box-shadow var(--transition), border-color var(--transition);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .widget:hover { border-color: rgba(255,255,255,0.18); }
+
+    /* Widget content container - responsive and scrollable */
+    .widget-content {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0; /* Important for flex to work */
+    }
+    
+    /* Responsive scrollbar */
+    .widget-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    .widget-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .widget-content::-webkit-scrollbar-thumb {
+      background: rgba(224,64,251,0.4);
+      border-radius: 3px;
+    }
+    .widget-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(224,64,251,0.7);
+    }
+
+    /* Edit mode */
+    body.edit-mode .widget {
+      cursor: move;
+      border-color: rgba(224,64,251,0.5) !important;
+      box-shadow: 0 0 0 2px rgba(224,64,251,0.18), 0 8px 32px rgba(0,0,0,0.4);
+    }
+    body.edit-mode .widget-controls { display: flex !important; }
+    body.edit-mode .resize-handle { display: block !important; }
+
+    .widget-controls {
+      display: none;
+      position: absolute; top: 8px; right: 8px;
+      gap: 6px; z-index: 10;
+    }
+    .widget-btn {
+      width: 24px; height: 24px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: var(--text);
+      transition: background var(--transition);
+    }
+    .widget-btn:hover { background: rgba(255,255,255,0.22); }
+    .widget-btn.danger:hover { background: rgba(255,60,60,0.4); }
+
+    .resize-handle {
+      display: none;
+      position: absolute; bottom: 4px; right: 4px;
+      width: 16px; height: 16px;
+      cursor: se-resize;
+      opacity: 0.7;
+      z-index: 5;
+    }
+    body.edit-mode .resize-handle {
+      display: block !important;
+    }
+    .resize-handle::after {
+      content: '';
+      position: absolute; bottom: 2px; right: 2px;
+      width: 8px; height: 8px;
+      border-right: 2px solid var(--accent);
+      border-bottom: 2px solid var(--accent);
+    }
+
+    /* ===== RIGHT SIDEBAR ===== */
+    #sidebar {
+      position: fixed; right: 0; top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+      display: flex; flex-direction: column;
+      gap: 4px;
+      padding: 8px 6px;
+      background: rgba(10,10,20,0.7);
+      border-left: 1px solid var(--glass-border);
+      border-radius: 14px 0 0 14px;
+      backdrop-filter: blur(20px);
+    }
+    .sb-btn {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background var(--transition), color var(--transition);
+      position: relative;
+    }
+    .sb-btn:hover { background: rgba(255,255,255,0.10); color: var(--text); }
+    .sb-btn.active { color: var(--accent); background: rgba(224,64,251,0.12); }
+    .sb-btn .tooltip {
+      position: absolute; right: 48px;
+      background: rgba(10,10,20,0.9);
+      border: 1px solid var(--glass-border);
+      color: var(--text);
+      font-size: 11px; padding: 4px 8px;
+      border-radius: 6px; white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.15s;
+    }
+    .sb-btn:hover .tooltip { opacity: 1; }
+
+    /* ===== ADD WIDGET PANEL ===== */
+    #widget-panel {
+      position: fixed; right: 52px; top: 50%;
+      transform: translateY(-50%);
+      width: 220px;
+      background: rgba(10,10,20,0.92);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(24px);
+      padding: 16px;
+      z-index: 99;
+      display: none;
+    }
+    #widget-panel h3 {
+      font-size: 12px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .widget-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background var(--transition);
+      margin-bottom: 4px;
+    }
+    .widget-option:hover { background: rgba(255,255,255,0.08); }
+    .widget-option span { font-size: 18px; }
+
+    /* ===== SETTINGS PANEL ===== */
+    #settings-panel {
+      position: fixed; right: 52px; top: 50%;
+      transform: translateY(-50%);
+      width: 260px;
+      background: rgba(10,10,20,0.95);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(24px);
+      padding: 20px;
+      z-index: 99;
+      display: none;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    #settings-panel h3 {
+      font-size: 12px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .setting-row { margin-bottom: 16px; }
+    .setting-label {
+      font-size: 12px; color: var(--text-muted);
+      margin-bottom: 6px; display: block;
+    }
+    .setting-row input[type=range] {
+      width: 100%; accent-color: var(--accent);
+    }
+    .setting-row input[type=color] {
+      width: 100%; height: 32px;
+      border-radius: 8px; border: 1px solid var(--glass-border);
+      background: none; cursor: pointer;
+    }
+    .upload-btn {
+      display: block; width: 100%;
+      padding: 10px;
+      background: rgba(224,64,251,0.15);
+      border: 1px solid rgba(224,64,251,0.3);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer; text-align: center;
+      transition: background var(--transition);
+    }
+    .upload-btn:hover { background: rgba(224,64,251,0.28); }
+    #bg-file-input { display: none; }
+
+    /* ===== CLOCK WIDGET ===== */
+    .clock-time {
+      font-size: 38px; font-weight: 700;
+      letter-spacing: -1px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .clock-date { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .clock-tz { font-size: 10px; color: var(--text-muted); margin-top: 2px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+    /* ===== WEATHER WIDGET ===== */
+    .weather-icon { font-size: 36px; }
+    .weather-temp { font-size: 32px; font-weight: 700; }
+    .weather-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .weather-loc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ===== SEARCH WIDGET ===== */
+    .search-form {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .search-input {
+      flex: 1;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color var(--transition), background var(--transition);
+    }
+    .search-input::placeholder { color: var(--text-muted); }
+    .search-input:focus {
+      border-color: rgba(224,64,251,0.5);
+      background: rgba(255,255,255,0.11);
+    }
+    .search-btn {
+      width: 36px; height: 36px;
+      background: var(--accent);
+      border: none; border-radius: 10px;
+      cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity var(--transition);
+    }
+    .search-btn:hover { opacity: 0.82; }
+    .search-engines {
+      display: flex; gap: 8px; margin-top: 10px;
+    }
+    .engine-btn {
+      font-size: 11px; padding: 4px 10px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px; cursor: pointer; color: var(--text-muted);
+      transition: background var(--transition), color var(--transition);
+    }
+    .engine-btn.active, .engine-btn:hover { background: rgba(224,64,251,0.18); color: var(--text); }
+
+    /* ===== QUICK LINKS ===== */
+    .ql-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .ql-title { font-size: 13px; font-weight: 600; }
+    .ql-add {
+      font-size: 12px; color: var(--accent);
+      cursor: pointer; padding: 4px 8px;
+      border-radius: 6px;
+      transition: background var(--transition);
+    }
+    .ql-add:hover { background: rgba(224,64,251,0.15); }
+    .ql-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .ql-item {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 10px 6px; border-radius: 10px;
+      cursor: pointer;
+      transition: background var(--transition);
+      text-decoration: none; color: var(--text);
+      position: relative;
+    }
+    .ql-item:hover { background: rgba(255,255,255,0.08); }
+    .ql-item img {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: rgba(255,255,255,0.1);
+    }
+    .ql-item span { font-size: 10px; color: var(--text-muted); text-align: center; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ql-item .ql-del {
+      display: none;
+      position: absolute; top: 2px; right: 2px;
+      width: 16px; height: 16px;
+      background: rgba(255,60,60,0.7);
+      border-radius: 50%; font-size: 10px;
+      align-items: center; justify-content: center; color: #fff;
+      cursor: pointer;
+    }
+    body.edit-mode .ql-item .ql-del { display: flex; }
+    .ql-placeholder {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 10px 6px; border-radius: 10px;
+      cursor: pointer; border: 1px dashed rgba(255,255,255,0.15);
+      transition: background var(--transition);
+    }
+    .ql-placeholder:hover { background: rgba(255,255,255,0.05); }
+    .ql-placeholder .icon { font-size: 20px; color: var(--text-muted); }
+
+    /* ===== NOTES WIDGET ===== */
+    .notes-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .notes-title { font-size: 13px; font-weight: 600; }
+    .notes-add { font-size: 12px; color: var(--accent); cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: background var(--transition); }
+    .notes-add:hover { background: rgba(224,64,251,0.15); }
+    .notes-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+    .note-item {
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px; padding: 10px;
+      font-size: 13px; color: var(--text-muted);
+      cursor: pointer; position: relative;
+      line-height: 1.5;
+    }
+    .note-item:hover { background: rgba(255,255,255,0.09); }
+    .note-del {
+      position: absolute; top: 6px; right: 8px;
+      font-size: 14px; color: rgba(255,80,80,0.6);
+      cursor: pointer;
+    }
+    .note-empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px 0; }
+
+    /* ===== TODO WIDGET ===== */
+    .todo-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .todo-title { font-size: 13px; font-weight: 600; }
+    .todo-count {
+      font-size: 11px;
+      background: rgba(224,64,251,0.2);
+      padding: 2px 8px; border-radius: 20px;
+      color: var(--accent);
+    }
+    .todo-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .todo-input {
+      flex: 1; background: rgba(255,255,255,0.07);
+      border: 1px solid var(--glass-border); border-radius: 8px;
+      padding: 8px 12px; color: var(--text); font-size: 13px; outline: none;
+    }
+    .todo-input:focus { border-color: rgba(224,64,251,0.4); }
+    .todo-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .todo-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      cursor: pointer; transition: background var(--transition);
+    }
+    .todo-item:hover { background: rgba(255,255,255,0.08); }
+    .todo-check {
+      width: 16px; height: 16px;
+      border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.3);
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 10px; transition: all var(--transition);
+    }
+    .todo-item.done .todo-check { background: var(--accent); border-color: var(--accent); }
+    .todo-item.done .todo-text { text-decoration: line-through; color: var(--text-muted); }
+    .todo-text { font-size: 13px; flex: 1; }
+    .todo-del { font-size: 13px; color: rgba(255,80,80,0.5); cursor: pointer; }
+    .todo-empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 16px 0; }
+
+    /* ===== EDIT MODE OVERLAY HINT ===== */
+    #edit-hint {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(224,64,251,0.18);
+      border: 1px solid rgba(224,64,251,0.35);
+      border-radius: 30px;
+      padding: 8px 20px;
+      font-size: 12px; color: var(--accent);
+      z-index: 200;
+      display: none;
+      letter-spacing: 0.05em;
+      backdrop-filter: blur(12px);
+    }
+    body.edit-mode #edit-hint { display: block; }
+
+    /* Scrollbar style */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 999;
+      background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(6px);
+    }
+    .modal {
+      background: rgba(14,14,28,0.97);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      padding: 28px;
+      min-width: 320px;
+      max-width: 90vw;
+    }
+    .modal h3 { font-size: 16px; margin-bottom: 16px; }
+    .modal input[type=text], .modal input[type=url] {
+      width: 100%; background: rgba(255,255,255,0.07);
+      border: 1px solid var(--glass-border); border-radius: 10px;
+      padding: 10px 14px; color: var(--text); font-size: 14px; outline: none;
+      margin-bottom: 12px;
+    }
+    .modal input:focus { border-color: rgba(224,64,251,0.5); }
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn {
+      padding: 8px 18px; border-radius: 10px; cursor: pointer;
+      font-size: 13px; border: none; transition: opacity var(--transition);
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: var(--text); border: 1px solid var(--glass-border); }
+    .btn:hover { opacity: 0.82; }
+
+    /* Textarea for note */
+    .modal textarea {
+      width: 100%; background: rgba(255,255,255,0.07);
+      border: 1px solid var(--glass-border); border-radius: 10px;
+      padding: 10px 14px; color: var(--text); font-size: 14px; outline: none;
+      resize: vertical; min-height: 100px; margin-bottom: 12px;
+      font-family: inherit;
+    }
+    .modal textarea:focus { border-color: rgba(224,64,251,0.5); }
+
+    /* Fade in animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .widget { animation: fadeIn 0.25s ease both; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- Background -->
+<div id="bg-layer"><div id="bg-default-gradient" style="width:100%;height:100%;background:radial-gradient(ellipse at 20% 50%, #1a0a2e 0%, #0a0a14 60%), radial-gradient(ellipse at 80% 20%, #2d0a3e 0%, transparent 50%);"></div></div>
+<div id="bg-overlay"></div>
+
+<!-- Desktop Canvas -->
+<div id="desktop"></div>
+
+<!-- Edit Hint -->
+<div id="edit-hint">✦ Edit Mode — Drag widgets to reposition · Resize from corner</div>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <button class="sb-btn" id="btn-bookmark" title="Bookmarks">
+    🔖<span class="tooltip">Bookmarks</span>
+  </button>
+  <button class="sb-btn" id="btn-edit">
+    ✏️<span class="tooltip">Edit Mode</span>
+  </button>
+  <button class="sb-btn" id="btn-settings">
+    ⚙️<span class="tooltip">Settings</span>
+  </button>
+  <button class="sb-btn" id="btn-theme">
+    🎨<span class="tooltip">Add Widget</span>
+  </button>
+  <button class="sb-btn" id="btn-upload">
+    ⬆️<span class="tooltip">Upload Background</span>
+  </button>
+  <button class="sb-btn" id="btn-trash">
+    🗑️<span class="tooltip">Clear All Widgets</span>
+  </button>
+  <button class="sb-btn" id="btn-help">
+    ❓<span class="tooltip">Help</span>
+  </button>
+</div>
+
+<!-- Add Widget Panel -->
+<div id="widget-panel">
+  <h3>Add Widget</h3>
+  <div class="widget-option" data-widget="clock"><span>🕐</span> Clock</div>
+  <div class="widget-option" data-widget="weather"><span>🌤️</span> Weather</div>
+  <div class="widget-option" data-widget="search"><span>🔍</span> Search</div>
+  <div class="widget-option" data-widget="quicklinks"><span>🔗</span> Quick Links</div>
+  <div class="widget-option" data-widget="notes"><span>📝</span> Notes</div>
+  <div class="widget-option" data-widget="todo"><span>✅</span> To-Do List</div>
+  <div class="widget-option" data-widget="calendar"><span>📅</span> Calendar</div>
+  <div class="widget-option" data-widget="timer"><span>⏱️</span> Timer</div>
+  <div class="widget-option" data-widget="pomodoro"><span>🍅</span> Pomodoro</div>
+  <div class="widget-option" data-widget="quotes"><span>💡</span> Quotes</div>
+</div>
+
+<!-- Settings Panel -->
+<div id="settings-panel">
+  <h3>Settings</h3>
+
+  <div class="setting-row">
+    <label class="setting-label">Background</label>
+    <label class="upload-btn" for="bg-file-input">📁 Upload Image or Video</label>
+    <input type="file" id="bg-file-input" accept="image/*,video/*">
+  </div>
+  <div class="setting-row">
+    <label class="setting-label">BG Overlay Darkness</label>
+    <input type="range" id="overlay-slider" min="0" max="0.85" step="0.05" value="0.28">
+  </div>
+  <div class="setting-row">
+    <label class="setting-label">Widget Blur</label>
+    <input type="range" id="blur-slider" min="0" max="40" step="1" value="18">
+  </div>
+  <div class="setting-row">
+    <label class="setting-label">Widget Opacity</label>
+    <input type="range" id="opacity-slider" min="0.05" max="0.95" step="0.05" value="0.55">
+  </div>
+  <div class="setting-row">
+    <label class="setting-label">Accent Color</label>
+    <input type="color" id="accent-color" value="#e040fb">
+  </div>
+  <div class="setting-row">
+    <label class="setting-label" style="margin-bottom:8px;">Background Preset</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="bg-preset" data-preset="default" style="width:48px;height:32px;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#1a0a2e,#0a0a14);border:1px solid rgba(255,255,255,0.15)" title="Default"></div>
+      <div class="bg-preset" data-preset="midnight" style="width:48px;height:32px;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#0d1b2a,#1b2838);border:1px solid rgba(255,255,255,0.15)" title="Midnight"></div>
+      <div class="bg-preset" data-preset="forest" style="width:48px;height:32px;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#0a1e0a,#1a2e10);border:1px solid rgba(255,255,255,0.15)" title="Forest"></div>
+      <div class="bg-preset" data-preset="sunset" style="width:48px;height:32px;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#2e0a0a,#2e1a0a);border:1px solid rgba(255,255,255,0.15)" title="Sunset"></div>
+    </div>
+  </div>
+  <div class="setting-row" style="margin-top:8px;">
+    <button class="upload-btn" id="btn-remove-bg">✕ Remove Custom Background</button>
+  </div>
+</div>
+
+<!-- Hidden file input -->
+<input type="file" id="bg-file-input-sb" accept="image/*,video/*" style="display:none">
+
+<script src="main.js"></script>
+</body>
+</html>
