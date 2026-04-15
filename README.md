@@ -57,6 +57,27 @@ Transform your Chrome new tab into a powerful personal dashboard with draggable 
   - ✅ To-Do defaults to Priority mode
   - ✅ Search defaults to Google
   - ✅ All user-changeable in settings
+  - ✅ **No modal popups** — Widgets appear instantly
+
+- **🎨 Advanced Widget Theming System** ⭐ **NEW**
+  - **20 Beautiful Themes** across 7 categories:
+    - **Minimal** (3): Glass, Minimal, Ghost
+    - **Neon** (4): Purple, Cyber Green, Neon Pink, Neon Blue
+    - **Dark** (3): Dark HC, Slate, Obsidian
+    - **Love** (2): Love, Rose Gold
+    - **Anime** (3): Anime, Sakura, Midnight Anime
+    - **Nature** (2): Forest, Ocean
+    - **Retro** (3): Retro, Terminal, Vaporwave
+  - **Per-Widget Style Panel** (Press 🎨 icon in edit mode)
+    - Live theme preview
+    - Custom background color picker
+    - Custom accent color picker
+    - **Custom font color picker**
+    - **Custom sub-text color picker** (dates, locations, etc.)
+    - Font size adjustment (S/M/L)
+    - Background opacity slider (affects background only, text stays clear)
+    - Border radius customization
+    - One-click reset to default
 
 - **Performance & Privacy**
   - No tracking or analytics
@@ -68,22 +89,24 @@ Transform your Chrome new tab into a powerful personal dashboard with draggable 
 
 ---
 
+## 📸 Screenshot Reference
+
+### Current Dashboard (April 15, 2026)
+
+![TabSpace Dashboard](./screenshot.jpg)
+
+**Visible in Screenshot:**
+- ⏰ **Analog Clock** (11:47) with glassmorphism effect
+- 🌤️ **Weather Widget** showing 34°C, Clear Sky, Jasdih location
+- ✅ **To-Do Widget** with priority-based task input
+- 🔗 **Quick Links** with Claude, ChatGPT, YouTube, Google, GitHub
+- **Beautiful dark theme** with purple/red gradient background
+- **Smooth glassmorphism** design with backdrop blur
+- **Responsive layout** with perfectly positioned widgets
+
+---
+
 ## 🚀 Coming Soon (Roadmap)
-
-### Q2 2026 — Widget Customization
-- [ ] **Theme-based Widgets** — Different visual styles per widget
-  - Minimal theme (clean, minimal)
-  - Glass theme (current, blur effect)
-  - Neon theme (bright, colorful)
-  - Dark theme (high contrast)
-- [ ] **Individual Widget Styling**
-  - Custom colors for each widget
-  - Font size adjustment per widget
-  - Opacity control
-  - Border radius customization
-  - Background color picker
-
-### Q3 2026 — Background Store
 - [ ] **Built-in Background Gallery**
   - 100+ free curated backgrounds
   - Category filter (nature, abstract, gradient, etc.)
@@ -135,23 +158,123 @@ cd tabspace
    - Click delete (✕) to remove
 
 ### 2. **Configure Widgets**
-   - **Weather**: Click temperature unit button to switch Celsius ↔ Fahrenheit
-   - **Clock**: Click clock icon to toggle 24hr ↔ 12hr
-   - **Search**: Click engine name to switch (Google, DuckDuckGo, Bing, YouTube)
+   - **Weather**: Celsius by default, changeable anytime
+   - **Clock**: 24-hour format by default, changeable anytime
+   - **Search**: Google by default, switch in widget header
    - **Note**: Click (+) to add note with optional heading
-   - **To-Do**: Click (+) to add task → select priority → add
+   - **To-Do**: Click (+) to add task with priority
 
-### 3. **Manage Settings**
+### 3. **Customize Widget Appearance** ⭐ **NEW**
+   **In Edit Mode (Ctrl+E):**
+   - Click **🎨 Style Button** on any widget (top-right corner)
+   - **Choose from 20 themes** organized by category
+   - **Customize colors:**
+     - Background color (affects widget transparency)
+     - Accent color (buttons, highlights)
+     - Font color (main text)
+     - Sub-font color (dates, locations, descriptions)
+   - **Adjust typography:**
+     - Font size: Small / Medium / Large
+     - Opacity slider: Makes background transparent (text stays clear)
+     - Roundness slider: Border radius customization
+   - **Live preview** — Changes apply instantly
+   - **One-click reset** — Back to default anytime
+   - **Auto-save** — All changes persist across reload
+
+### 4. **Manage Settings**
    - Click **"Settings"** (sidebar)
    - Adjust overlay opacity
    - Adjust blur intensity
-   - Adjust widget opacity
-   - Pick accent color
+   - Adjust widget opacity (global)
+   - Pick accent color (global)
 
-### 4. **Import/Export**
+### 5. **Import/Export**
    - Click **"Settings"** → Export
    - Save configuration JSON
    - On new device: Import JSON to restore
+
+---
+
+## 🎨 Widget Theming System
+
+### How to Style Widgets
+
+1. **Enter Edit Mode** → Press `Ctrl+E`
+2. **Click 🎨 Button** → Top-right corner of any widget
+3. **Style Panel Opens** → Floating customization panel
+4. **Choose Theme** → Click any of 20 theme chips
+5. **Fine-tune Colors** → Use color pickers for custom look
+6. **Adjust Settings** → Font size, opacity, roundness
+7. **See Live Preview** → Changes apply instantly
+8. **Save** → Click "✓ Done" or click outside panel
+
+### The 20 Available Themes
+
+#### **Minimal (3)**
+- 🔷 **Glass** — Default glassmorphism (frosted glass effect)
+- ⬜ **Minimal** — Ultra-clean, minimal borders
+- 👻 **Ghost** — Almost invisible, barely there
+
+#### **Neon (4)**
+- 💜 **Neon Purple** — Bright purple glow border
+- 💚 **Cyber Green** — Matrix-style green (hacker aesthetic)
+- 💗 **Neon Pink** — Hot pink with glow
+- 💙 **Neon Blue** — Electric cyan blue
+
+#### **Dark (3)**
+- ⬛ **Dark HC** — High contrast black, perfect for readability
+- 🩶 **Slate** — Blue-grey dark theme
+- 💎 **Obsidian** — Deep dark purple tint
+
+#### **Love (2)**
+- ❤️ **Love** — Deep red passionate theme
+- 🌹 **Rose Gold** — Warm metallic rose
+
+#### **Anime (3)**
+- 🎨 **Anime** — Soft pink pastel
+- 🌸 **Sakura** — Cherry blossom pink
+- 🌙 **Midnight Anime** — Dark purple dreamy theme
+
+#### **Nature (2)**
+- 🌲 **Forest** — Deep forest green
+- 🌊 **Ocean** — Sea blue calm
+
+#### **Retro (3)**
+- 📺 **Retro** — Orange pixel style
+- ⌨️ **Terminal** — Green phosphor CRT monitor
+- 🌈 **Vaporwave** — Retrowave pink/blue aesthetic
+
+### Customization Options
+
+| Setting | Range | Effect |
+|---------|-------|--------|
+| **Background Color** | Any HEX | Widget background |
+| **Accent Color** | Any HEX | Buttons, highlights, text accents |
+| **Font Color** | Any HEX | Main text (time, title, content) |
+| **Sub-Font Color** | Any HEX | Secondary text (dates, location, descriptions) |
+| **Font Size** | S / M / L | Scale: 0.9x / 1.0x / 1.1x |
+| **Opacity** | 0.2 - 1.0 | Background transparency (20% - 100%) |
+| **Roundness** | 0 - 32px | Border radius |
+
+### Examples
+
+**Dark & Professional:**
+- Theme: Dark HC
+- Background: #0a0a14
+- Accent: #e040fb
+- Font Color: #ffffff
+- Sub-Font Color: #b0b0b8
+- Opacity: 0.8
+- Roundness: 12px
+
+**Light & Minimal:**
+- Theme: Minimal
+- Background: #f5f5f5
+- Accent: #6366f1
+- Font Color: #1a1a1a
+- Sub-Font Color: #666666
+- Opacity: 1.0
+- Roundness: 8px
 
 ---
 

@@ -1,0 +1,319 @@
+/*
+ * TabSpace — Widget Theming System
+ * widget-themes.css
+ *
+ * Styles for the per-widget style panel UI.
+ * Add <link rel="stylesheet" href="widget-themes.css"> to newtab.html <head>
+ */
+
+/* ── Widget color variable passthrough ── */
+.widget {
+  /* These are set inline by WidgetThemes.applyToElement() */
+  /* They cascade into all child elements using var() */
+  color: var(--wt-text, var(--text));
+}
+
+/* Make widget content use wt-text for all text */
+.widget .widget-content {
+  color: var(--wt-text, var(--text));
+}
+
+/* Accent color passthrough for inner elements */
+.widget .notes-add,
+.widget .todo-count,
+.widget [style*="var(--accent)"] {
+  color: var(--wt-accent, var(--accent)) !important;
+}
+
+/* Muted/secondary text color — applies to all secondary text */
+.widget .clock-date,
+.widget .clock-tz,
+.widget .weather-desc,
+.widget .weather-loc,
+.widget .widget-subtitle,
+.widget .widget-subtext,
+.widget .widget-meta,
+.widget .time-subtitle,
+.widget .location-text,
+.widget .date-text,
+.widget .notes-date,
+.widget .notes-item-date,
+.widget .notes-time,
+.widget [style*="text-muted"],
+.widget [style*="muted"] {
+  color: var(--wt-muted, rgba(200, 200, 210, 0.6)) !important;
+}
+
+.widget .widget-content::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--wt-accent, var(--accent)) 40%, transparent);
+}
+
+/* ══════════════════════════════════════════
+   STYLE PANEL
+══════════════════════════════════════════ */
+.wt-panel {
+  position: fixed;
+  z-index: 9999;
+  width: 280px;
+  background: rgba(8, 8, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7),
+              0 0 0 1px rgba(255,255,255,0.04);
+  overflow: hidden;
+  animation: wt-slide-in 0.18s cubic-bezier(.4, 0, .2, 1);
+  user-select: none;
+}
+
+@keyframes wt-slide-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.wt-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0f0f5;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.wt-close {
+  background: none;
+  border: none;
+  color: rgba(240,240,245,0.5);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.wt-close:hover {
+  color: #f0f0f5;
+  background: rgba(255,255,255,0.1);
+}
+
+.wt-panel-body {
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+/* Scrollbar in panel */
+.wt-panel-body::-webkit-scrollbar { width: 4px; }
+.wt-panel-body::-webkit-scrollbar-track { background: transparent; }
+.wt-panel-body::-webkit-scrollbar-thumb {
+  background: rgba(224,64,251,0.3);
+  border-radius: 2px;
+}
+
+.wt-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(240,240,245,0.4);
+  margin-bottom: 4px;
+}
+
+/* ── Category labels ── */
+.wt-cat-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.3);
+  margin-top: 8px;
+  margin-bottom: 3px;
+}
+
+.wt-theme-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.wt-theme-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+/* ── Theme chip buttons ── */
+.wt-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  cursor: pointer;
+  transition: all 0.15s;
+  color: rgba(240,240,245,0.7);
+  min-width: 58px;
+  flex: 1;
+}
+
+.wt-chip:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.18);
+  color: #f0f0f5;
+  transform: translateY(-1px);
+}
+
+.wt-chip--active {
+  background: rgba(224, 64, 251, 0.18) !important;
+  border-color: rgba(224, 64, 251, 0.5) !important;
+  color: #f0f0f5 !important;
+  box-shadow: 0 0 0 1px rgba(224,64,251,0.3);
+}
+
+.wt-chip-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wt-chip-name {
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+  text-align: center;
+}
+
+/* ── Rows (color pickers, sliders) ── */
+.wt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.wt-label {
+  font-size: 11px;
+  color: rgba(240,240,245,0.65);
+  flex: 1;
+  white-space: nowrap;
+}
+
+.wt-color-input {
+  width: 32px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  padding: 2px;
+  background: none;
+  flex-shrink: 0;
+}
+.wt-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.wt-color-input::-webkit-color-swatch {
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.wt-clear-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  color: rgba(240,240,245,0.4);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 6px;
+  transition: all 0.15s;
+}
+.wt-clear-btn:hover {
+  background: rgba(255,60,60,0.2);
+  border-color: rgba(255,60,60,0.4);
+  color: #ff8080;
+}
+
+/* ── Font size buttons ── */
+.wt-btn-group {
+  display: flex;
+  gap: 4px;
+}
+
+.wt-sz {
+  width: 30px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  color: rgba(240,240,245,0.6);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 11px;
+  transition: all 0.15s;
+}
+.wt-sz:hover {
+  background: rgba(255,255,255,0.12);
+  color: #f0f0f5;
+}
+.wt-sz--active {
+  background: rgba(224,64,251,0.22) !important;
+  border-color: rgba(224,64,251,0.5) !important;
+  color: #f0f0f5 !important;
+}
+
+/* ── Range sliders ── */
+.wt-range {
+  flex: 1;
+  height: 4px;
+  border-radius: 4px;
+  accent-color: #e040fb;
+  cursor: pointer;
+}
+
+.wt-range-val {
+  font-size: 10px;
+  color: rgba(240,240,245,0.5);
+  width: 34px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Action buttons ── */
+.wt-action-btn {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  color: rgba(240,240,245,0.7);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.wt-action-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #f0f0f5;
+}
+.wt-action-btn--primary {
+  background: rgba(224,64,251,0.18) !important;
+  border-color: rgba(224,64,251,0.4) !important;
+  color: #f0f0f5 !important;
+}
+.wt-action-btn--primary:hover {
+  background: rgba(224,64,251,0.30) !important;
+}
+
+/* ── Style button in widget controls ── */
+.widget-btn.wt-style-btn {
+  font-size: 13px;
+}

@@ -148,7 +148,7 @@ const THEME_KEY = 'TabSpace_theme';
 const MAX_UNDO_STEPS = 20;
 
 // Rate limiters
-const weatherRateLimiter = new RateLimiter(3, 300000); // 3 calls per 5 minutes
+const weatherRateLimiter = new RateLimiter(1, 300000); // 1 call per 5 minutes
 const geolocationCache = { coords: null, timestamp: 0, maxAge: 3600000 };
 
 // Debounced functions
@@ -282,14 +282,6 @@ function setupEventListeners() {
     if (btnRemoveBg) {
       btnRemoveBg.addEventListener('click', removeBg);
     }
-    
-    // Weather settings button delegation
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('.weather-settings')) {
-        const id = e.target.closest('.weather-settings')?.getAttribute('data-id');
-        if (id) showWeatherSettings(id);
-      }
-    });
     
     Logger.log('Event listeners attached');
   } catch(e) {
@@ -581,62 +573,13 @@ function loadDefaults() {
     const vw = Math.max(window.innerWidth, 400);
     const vh = Math.max(window.innerHeight, 400);
     
-    // Device-aware sizing: scale widgets based on screen width
-    let clockW = 280, clockH = 180;
-    let weatherW = 200, weatherH = 160;
-    let todoW = 280, todoH = 260;
-    let qlW = 320, qlH = 200;
-    let noteW = 320, noteH = 200;
+    addWidget('clock', 40, 40);
+    addWidget('weather', Math.max(vw - 220, 100), 20);
+    addWidget('todo', 40, 200);
+    addWidget('quicklinks', Math.max(vw - 340, 100), 200);
+    addWidget('notes', Math.max(vw - 340, 100), 460);
     
-    // Mobile/Tablet (< 768px)
-    if (vw < 768) {
-      clockW = 240; clockH = 140;
-      weatherW = 160; weatherH = 120;
-      todoW = 240; todoH = 200;
-      qlW = 240; qlH = 160;
-      noteW = 240; noteH = 160;
-    }
-    // Small Laptop 13" (768px - 1024px)
-    else if (vw < 1024) {
-      clockW = 260; clockH = 160;
-      weatherW = 180; weatherH = 140;
-      todoW = 260; todoH = 230;
-      qlW = 300; qlH = 180;
-      noteW = 300; noteH = 180;
-    }
-    // Large Laptop 14-16" (1024px - 1440px)
-    else if (vw < 1440) {
-      clockW = 280; clockH = 180;
-      weatherW = 200; weatherH = 160;
-      todoW = 280; todoH = 260;
-      qlW = 320; qlH = 200;
-      noteW = 320; noteH = 200;
-    }
-    // Large Monitor 17"+ (1440px+)
-    else {
-      clockW = 320; clockH = 200;
-      weatherW = 240; weatherH = 180;
-      todoW = 320; todoH = 280;
-      qlW = 360; qlH = 220;
-      noteW = 360; noteH = 220;
-    }
-    
-    // Clock - 24hr format as default
-    addWidget('clock', 40, 40, clockW, clockH, { variant: '24h' });
-    
-    // Weather - Celsius as default
-    addWidget('weather', Math.max(vw - weatherW - 20, 100), 40, weatherW, weatherH, { variant: 'celsius' });
-    
-    // Todo - Priority view as default
-    addWidget('todo', 40, clockH + 100, todoW, todoH, {});
-    
-    // Quick Links - empty by default
-    addWidget('quicklinks', Math.max(vw - qlW - 20, 100), clockH + 100, qlW, qlH, {});
-    
-    // Notes - empty by default (under quick links)
-    addWidget('notes', Math.max(vw - noteW - 20, 100), clockH + todoH + 140, noteW, noteH, {});
-    
-    Logger.log('Default widgets created with device-aware sizing');
+    Logger.log('Default widgets created');
   } catch(e) {
     Logger.error('loadDefaults failed', e.message);
   }
@@ -897,11 +840,25 @@ function addWidget(type, x, y, w, h, data) {
       return;
     }
     
-    // Show variant selection for widgets with variants (removed notes & todo)
-    const variantWidgets = ['clock', 'weather'];
-    if (variantWidgets.includes(type) && !data?.variant) {
-      showWidgetVariantModal(type, x, y, w, h);
-      return;
+    // Show variant selection for widgets with variants - REMOVED (use defaults instead)
+    // const variantWidgets = ['clock'];
+    // if (variantWidgets.includes(type) && !data?.variant) {
+    //   showWidgetVariantModal(type, x, y, w, h);
+    //   return;
+    // }
+    
+    // Set default variants for all widgets
+    if (type === 'clock' && !data?.variant) {
+      data = { ...data, variant: 'digital_24' };  // Default: 24-hour digital
+    }
+    if (type === 'weather' && !data?.variant) {
+      data = { ...data, variant: 'celsius' };    // Default: Celsius
+    }
+    if (type === 'todo' && !data?.variant) {
+      data = { ...data, variant: 'priority' };   // Default: Priority mode
+    }
+    if (type === 'notes' && !data?.variant) {
+      data = { ...data, variant: 'plain' };      // Default: Plain text
     }
     
     const vw = Math.max(window.innerWidth, 400);
@@ -1006,6 +963,14 @@ function renderWidgetContent(type, id, data) {
       case 'pomodoro': renderPomodoro(content, id, data); break;
       case 'quotes': renderQuotes(content, id, data); break;
       default: Logger.warn('Unknown widget type', type);
+    }
+    
+    // Re-apply theme after rendering content (ensures styles persist)
+    if (typeof WidgetThemes !== 'undefined' && typeof WidgetThemes.applyToElement === 'function') {
+      const el = DOM.get(id);
+      if (el && widgets[id]?.data) {
+        WidgetThemes.applyToElement(el, id, widgets[id].data);
+      }
     }
   } catch(e) {
     Logger.error('renderWidgetContent failed', e);
@@ -1255,10 +1220,7 @@ function showWidgetVariantModal(type, x, y, w, h) {
     </div>
   `;
 
-  showModal(content, {
-    actions: [],
-    onClose: () => {}
-  });
+  showModal(content);
 
   // Attach click handlers
   document.querySelectorAll('.variant-btn').forEach(btn => {
@@ -1403,37 +1365,22 @@ function renderWeather(container, id) {
       // Use cached data
       const displayTemp = isFahrenheit ? Math.round((data.temp * 9/5) + 32) : Math.round(data.temp);
       const unit = isFahrenheit ? '°F' : '°C';
-      const controls = `
-        <button class="widget-control weather-settings" data-id="${id}" title="Change temperature unit">⚙️</button>
-      `;
       
       container.innerHTML = `
         <div class="weather-icon">${getWeatherIcon(data.code)}</div>
         <div class="weather-temp">${displayTemp}${unit}</div>
         <div class="weather-desc">${escapeHTML(data.desc || '')}</div>
         <div class="weather-loc">${escapeHTML(data.loc || 'Your location')}</div>
-        <div class="widget-controls" style="position: absolute; top: 4px; right: 4px;">
-          ${controls}
-        </div>
       `;
     } else {
       const unit = isFahrenheit ? '°F' : '°C';
       container.innerHTML = `
         <div class="weather-icon">🌤️</div>
         <div class="weather-temp" id="wt-${id}">--${unit}</div>
-        <div class="weather-desc" id="wd-${id}">Getting location...</div>
+        <div class="weather-desc" id="wd-${id}">Fetching weather...</div>
         <div class="weather-loc" id="wl-${id}">Your location</div>
       `;
-      
-      // Set timeout for slow geolocation
-      const weatherTimeout = setTimeout(() => {
-        const desc = DOM.get('wd-' + id);
-        if (desc && desc.textContent === 'Getting location...') {
-          desc.textContent = 'Location slow - allow permission';
-        }
-      }, 8000);
-      
-      fetchWeather(id, weatherTimeout);
+      fetchWeather(id);
     }
   } catch(e) {
     Logger.error('renderWeather failed', e);
@@ -1470,7 +1417,7 @@ function showWeatherSettings(id) {
     </div>
   `;
 
-  showModal(content, { actions: [] });
+  showModal(content);
 
   document.querySelectorAll('.weather-variant-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1494,46 +1441,39 @@ function showWeatherSettings(id) {
   });
 }
 
-function fetchWeather(id, weatherTimeout) {
+function fetchWeather(id) {
   try {
     // Rate limit and cache check
     if (!weatherRateLimiter.canCall()) {
-      Logger.warn('Weather API call rate-limited - max 3 calls per 5 minutes');
+      Logger.warn('Weather API call rate-limited');
       return;
     }
     
     if (!navigator.geolocation) {
       Logger.warn('Geolocation not available');
-      const el = DOM.get('wd-' + id);
-      if (el) el.textContent = 'Geolocation unavailable';
-      if (weatherTimeout) clearTimeout(weatherTimeout);
       return;
     }
     
     // Use cached coordinates if available
     if (geolocationCache.coords && Date.now() - geolocationCache.timestamp < geolocationCache.maxAge) {
-      if (weatherTimeout) clearTimeout(weatherTimeout);
       fetchWeatherWithCoords(geolocationCache.coords, id);
       return;
     }
     
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (weatherTimeout) clearTimeout(weatherTimeout);
         geolocationCache.coords = pos.coords;
         geolocationCache.timestamp = Date.now();
         fetchWeatherWithCoords(pos.coords, id);
       },
       (err) => {
-        if (weatherTimeout) clearTimeout(weatherTimeout);
         Logger.warn('Geolocation error', err.message);
         const el = DOM.get('wd-' + id);
-        if (el) el.textContent = err.code === 1 ? 'Location denied' : 'Location slow - retry';
+        if (el) el.textContent = err.code === 1 ? 'Location denied' : 'Location unavailable';
       },
-      { timeout: 8000, maximumAge: 3600000 }
+      { timeout: 10000, maximumAge: 3600000 }
     );
   } catch(e) {
-    if (weatherTimeout) clearTimeout(weatherTimeout);
     Logger.error('fetchWeather failed', e);
   }
 }
@@ -1542,83 +1482,33 @@ async function fetchWeatherWithCoords(coords, id) {
   try {
     const { latitude: lat, longitude: lon } = coords;
     
-    // Fetch weather data with error handling
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
-    let weatherRes;
-    let useCache = false;
+    // Fetch weather data
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+    const weatherRes = await fetch(weatherUrl, { timeout: 5000 });
     
-    try {
-      weatherRes = await fetch(weatherUrl);
-    } catch(fetchErr) {
-      // Network error - try using cached data if available
-      Logger.warn('Weather fetch network error', fetchErr.message);
-      useCache = true;
-      
-      // Check if we have cached weather data (within 1 hour)
-      if (widgets[id]?.data?.temp !== undefined && widgets[id]?.data?.fetchedAt > Date.now() - 3600000) {
-        const cachedData = widgets[id].data;
-        const variant = cachedData.variant || 'celsius';
-        const displayTemp = variant === 'fahrenheit' ? Math.round((cachedData.temp * 9/5) + 32) : Math.round(cachedData.temp);
-        const unit = variant === 'fahrenheit' ? '°F' : '°C';
-        
-        const tempEl = DOM.get('wt-' + id);
-        if (tempEl) tempEl.textContent = displayTemp + unit;
-        
-        const descEl = DOM.get('wd-' + id);
-        if (descEl) descEl.textContent = (cachedData.desc || 'Unknown') + ' (cached)';
-        
-        const locEl = DOM.get('wl-' + id);
-        if (locEl) locEl.textContent = cachedData.loc || 'Your location';
-        
-        return;
-      }
-      
-      // No cache available, show error
-      const el = DOM.get('wd-' + id);
-      if (el) el.textContent = 'Network unavailable';
-      return;
-    }
-    
-    if (!weatherRes.ok) {
-      Logger.warn('Weather API error', weatherRes.status + ' ' + weatherRes.statusText);
-      const el = DOM.get('wd-' + id);
-      if (el) el.textContent = weatherRes.status === 429 ? 'Rate limited' : 'Service error';
-      return;
-    }
+    if (!weatherRes.ok) throw new Error('Weather API failed');
     
     const weatherData = await weatherRes.json();
     const cw = weatherData?.current_weather;
     
-    if (!cw) {
-      Logger.warn('Invalid weather response', weatherData);
-      const el = DOM.get('wd-' + id);
-      if (el) el.textContent = 'Invalid response';
-      return;
-    }
+    if (!cw) throw new Error('Invalid weather response');
     
     const temp = cw.temperature;
     const code = cw.weathercode || 0;
     
-    // Fetch location data (non-blocking, non-critical)
+    // Fetch location data
     const locUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
     let loc = 'Your location';
     
-    fetch(locUrl).then(locRes => {
-      if (locRes.ok) return locRes.json();
-    }).then(locData => {
-      if (locData?.address) {
-        loc = locData.address.city || locData.address.town || locData.address.village || loc;
-        // Update location if different
-        if (widgets[id]?.data) {
-          widgets[id].data.loc = loc;
-          debouncedSaveState();
-        }
-        const locEl = DOM.get('wl-' + id);
-        if (locEl) locEl.textContent = loc;
+    try {
+      const locRes = await fetch(locUrl, { timeout: 5000 });
+      if (locRes.ok) {
+        const locData = await locRes.json();
+        loc = locData?.address?.city || locData?.address?.town || locData?.address?.village || loc;
       }
-    }).catch(e => {
-      Logger.warn('Location API failed', e.message);
-    });
+    } catch(e) {
+      Logger.warn('Location API failed', e);
+    }
     
     // Update widget data
     if (widgets[id]) {
@@ -1627,7 +1517,6 @@ async function fetchWeatherWithCoords(coords, id) {
         code, 
         desc: weatherDesc(code), 
         loc,
-        variant: widgets[id].data?.variant || 'celsius',
         fetchedAt: Date.now(),
       };
       debouncedSaveState();
@@ -1651,9 +1540,9 @@ async function fetchWeatherWithCoords(coords, id) {
     const iconEl = DOM.query(`#content-${id} .weather-icon`);
     if (iconEl) iconEl.textContent = getWeatherIcon(code);
   } catch(e) {
-    Logger.error('fetchWeatherWithCoords unexpected error', e.message);
+    Logger.error('fetchWeatherWithCoords failed', e);
     const el = DOM.get('wd-' + id);
-    if (el) el.textContent = 'Weather error';
+    if (el) el.textContent = 'Weather unavailable';
   }
 }
 
@@ -2023,11 +1912,14 @@ function renderNotes(container, id, data) {
   
   try {
     const notes = data.notes || [];
+    const variant = data.variant || 'plain'; // plain or markdown
     
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:4px;">
         <span style="font-weight:700;font-size:13px;">📝 Notes</span>
-        <span class="notes-add" data-notes-add="${id}" style="font-weight:700;color:var(--accent);cursor:pointer;">+</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <span class="notes-add" data-notes-add="${id}" style="font-weight:700;color:var(--accent);cursor:pointer;">+</span>
+        </div>
       </div>
       <div class="notes-list" style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;flex-grow:1;font-size:11px;">
         ${notes.length ? notes.map((n, i) => {
@@ -2039,7 +1931,7 @@ function renderNotes(container, id, data) {
                 ${note.heading ? '<div style="font-weight:700;color:var(--accent);margin-bottom:2px;">' + escapeHTML(note.heading) + '</div>' : ''}
                 <div style="font-size:10px;color:var(--text-muted);">${escapeHTML(displayHeading)}</div>
               </div>
-              <span class="note-del" data-note-del="${id}" data-note-index="${i}" style="cursor:pointer;opacity:1;color:#ff4081;font-weight:700;font-size:16px;flex-shrink:0;transition:all 0.2s;" title="Delete">✕</span>
+              <span class="note-del" data-note-del="${id}" data-note-index="${i}" style="cursor:pointer;opacity:0.6;flex-shrink:0;" title="Delete">✕</span>
             </div>
           `;
         }).join('') : '<div style="text-align:center;color:var(--text-muted);padding:12px;font-size:11px;">No notes yet</div>'}
@@ -2063,8 +1955,6 @@ function renderNotes(container, id, data) {
         const idx = parseInt(del.getAttribute('data-note-index'));
         removeNote(widgetId, idx);
       });
-      del.addEventListener('mouseover', () => { del.style.opacity = '1'; del.style.transform = 'scale(1.2)'; });
-      del.addEventListener('mouseout', () => { del.style.opacity = '1'; del.style.transform = 'scale(1)'; });
     });
     
     const addBtn = container.querySelector('[data-notes-add]');
@@ -2076,6 +1966,61 @@ function renderNotes(container, id, data) {
   } catch(e) {
     Logger.error('renderNotes failed', e);
   }
+}
+
+function showNotesSettings(id) {
+  const content = `
+    <div style="text-align: center; padding: 8px;">
+      <h3 style="margin: 0 0 16px 0; font-size: 18px;">📝 Notes Style</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button class="notes-variant-btn" data-variant="plain" style="
+          padding: 12px;
+          border: 2px solid var(--glass-border);
+          background: var(--glass-bg);
+          color: var(--text);
+          border-radius: var(--radius);
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.3s ease;
+        ">📝 Plain Text</button>
+        <button class="notes-variant-btn" data-variant="markdown" style="
+          padding: 12px;
+          border: 2px solid var(--glass-border);
+          background: var(--glass-bg);
+          color: var(--text);
+          border-radius: var(--radius);
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.3s ease;
+        ">📄 Markdown Support</button>
+      </div>
+    </div>
+  `;
+
+  showModal(content);
+
+  document.querySelectorAll('.notes-variant-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const variant = btn.getAttribute('data-variant');
+      if (widgets[id]) {
+        widgets[id].data.variant = variant;
+        debouncedSaveState();
+        closeModal();
+        const container = document.getElementById('w-' + id);
+        renderNotes(container, id, widgets[id].data);
+      }
+    });
+    
+    btn.addEventListener('mouseover', () => {
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.boxShadow = '0 0 12px rgba(var(--accent-rgb), 0.3)';
+    });
+    
+    btn.addEventListener('mouseout', () => {
+      btn.style.borderColor = 'var(--glass-border)';
+      btn.style.boxShadow = 'none';
+    });
+  });
 }
 
 function addNote(id) {
@@ -2179,28 +2124,33 @@ function renderTodo(container, id, data) {
   try {
     const todos = data.todos || [];
     const count = todos.filter(t => !t.done).length;
+    const variant = data.variant || 'priority'; // Priority by default
     
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:4px;flex-wrap:wrap;">
         <span style="font-weight:700;font-size:13px;">✅ To-Do</span>
-        <span style="font-size:11px;background:rgba(224,64,251,0.3);padding:2px 8px;border-radius:12px;font-weight:700;">${count}</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <span style="font-size:11px;background:rgba(224,64,251,0.3);padding:2px 8px;border-radius:12px;font-weight:700;">${count}</span>
+        </div>
       </div>
-      <div style="margin-bottom:6px;display:flex;gap:4px;">
-        <input class="todo-input" id="ti-${id}" placeholder="Add task..." maxlength="100" data-todo-input="${id}" style="flex-grow:1;padding:6px;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.05);color:var(--text);font-size:11px;box-sizing:border-box;">
-        <button class="todo-add-btn" data-todo-add-btn="${id}" style="padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;transition:all 0.2s;" title="Press Enter or click to add">+</button>
+      <div style="margin-bottom:6px;">
+        <input class="todo-input" id="ti-${id}" placeholder="Add task..." maxlength="100" data-todo-input="${id}" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.05);color:var(--text);font-size:11px;box-sizing:border-box;">
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex-grow:1;font-size:11px;">
         ${todos.length ? todos.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)).map((t, i) => {
           const actualIdx = todos.findIndex(todo => todo === t);
-          const priorityIcon = t.priority === 'high' ? '⭐' : t.priority === 'medium' ? '✴️' : '○';
-          const priorityColor = t.priority === 'high' ? '#ff4081' : t.priority === 'medium' ? '#ffc107' : 'rgba(255,255,255,0.3)';
+          const priorityIcon = variant === 'priority' ? (t.priority === 'high' ? '⭐' : t.priority === 'medium' ? '✴️' : '○') : '';
+          const priorityColor = variant === 'priority' ? (t.priority === 'high' ? '#ff4081' : t.priority === 'medium' ? '#ffc107' : 'rgba(255,255,255,0.3)') : 'rgba(255,255,255,0.3)';
+          const prioritySpan = variant === 'priority' ? `<span style="width:14px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;" title="Priority">${priorityIcon}</span>` : '';
+          const pinBtn = variant === 'priority' ? `<span class="todo-pin" data-todo-pin="${id}" data-todo-index="${actualIdx}" style="cursor:pointer;opacity:${t.pinned ? '1' : '0.5'};flex-shrink:0;font-size:12px;" title="Pin task">📌</span>` : '';
+          
           return `
             <div data-todo-item="${id}" data-todo-index="${actualIdx}" style="display:flex;gap:6px;align-items:center;padding:6px;background:${t.pinned ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.05)'};border-radius:6px;cursor:pointer;transition:all 0.2s;border-left:3px solid ${priorityColor};${t.done ? 'opacity:0.5;text-decoration:line-through;' : ''}">
               <div style="width:16px;height:16px;border:2px solid var(--accent);border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${t.done ? 'var(--accent)' : 'transparent'};color:#fff;font-size:11px;">${t.done ? '✓' : ''}</div>
-              <span style="width:14px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;" title="Priority">${priorityIcon}</span>
+              ${prioritySpan}
               <span style="flex-grow:1;word-break:break-word;">${escapeHTML(t.text)}</span>
-              <span class="todo-pin" data-todo-pin="${id}" data-todo-index="${actualIdx}" style="cursor:pointer;opacity:${t.pinned ? '1' : '0.5'};flex-shrink:0;font-size:12px;transition:opacity 0.2s;" title="Pin task">📌</span>
-              <span class="todo-del" data-todo-del="${id}" data-todo-index="${actualIdx}" style="cursor:pointer;opacity:1;flex-shrink:0;color:#ff4081;font-weight:700;font-size:16px;transition:all 0.2s;" title="Delete">✕</span>
+              ${pinBtn}
+              <span class="todo-del" data-todo-del="${id}" data-todo-index="${actualIdx}" style="cursor:pointer;opacity:0.6;flex-shrink:0;" title="Delete">✕</span>
             </div>
           `;
         }).join('') : '<div style="text-align:center;color:var(--text-muted);padding:12px;font-size:11px;">No tasks yet</div>'}
@@ -2212,16 +2162,6 @@ function renderTodo(container, id, data) {
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') todoKeydown(e, id);
       });
-    }
-    
-    const addBtn = container.querySelector('[data-todo-add-btn]');
-    if (addBtn) {
-      addBtn.addEventListener('click', () => {
-        const inp = container.querySelector('[data-todo-input]');
-        if (inp) todoKeydown({ key: 'Enter' }, id);
-      });
-      addBtn.addEventListener('mouseover', () => { addBtn.style.transform = 'scale(1.08)'; addBtn.style.opacity = '0.9'; });
-      addBtn.addEventListener('mouseout', () => { addBtn.style.transform = 'scale(1)'; addBtn.style.opacity = '1'; });
     }
     
     container.querySelectorAll('[data-todo-item]').forEach(item => {
@@ -2250,12 +2190,65 @@ function renderTodo(container, id, data) {
         const idx = parseInt(del.getAttribute('data-todo-index'));
         deleteTodo(null, widgetId, idx);
       });
-      del.addEventListener('mouseover', () => { del.style.opacity = '1'; del.style.transform = 'scale(1.2)'; });
-      del.addEventListener('mouseout', () => { del.style.opacity = '1'; del.style.transform = 'scale(1)'; });
     });
   } catch(e) {
     Logger.error('renderTodo failed', e);
   }
+}
+
+function showTodoSettings(id) {
+  const content = `
+    <div style="text-align: center; padding: 8px;">
+      <h3 style="margin: 0 0 16px 0; font-size: 18px;">✓ Todo Style</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button class="todo-variant-btn" data-variant="simple" style="
+          padding: 12px;
+          border: 2px solid var(--glass-border);
+          background: var(--glass-bg);
+          color: var(--text);
+          border-radius: var(--radius);
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.3s ease;
+        ">✓ Simple Todo</button>
+        <button class="todo-variant-btn" data-variant="priority" style="
+          padding: 12px;
+          border: 2px solid var(--glass-border);
+          background: var(--glass-bg);
+          color: var(--text);
+          border-radius: var(--radius);
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.3s ease;
+        ">⭐ With Priority</button>
+      </div>
+    </div>
+  `;
+
+  showModal(content);
+
+  document.querySelectorAll('.todo-variant-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const variant = btn.getAttribute('data-variant');
+      if (widgets[id]) {
+        widgets[id].data.variant = variant;
+        debouncedSaveState();
+        closeModal();
+        const container = document.getElementById('w-' + id);
+        renderTodo(container, id, widgets[id].data);
+      }
+    });
+    
+    btn.addEventListener('mouseover', () => {
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.boxShadow = '0 0 12px rgba(var(--accent-rgb), 0.3)';
+    });
+    
+    btn.addEventListener('mouseout', () => {
+      btn.style.borderColor = 'var(--glass-border)';
+      btn.style.boxShadow = 'none';
+    });
+  });
 }
 
 function todoKeydown(e, id) {
