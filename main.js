@@ -478,6 +478,9 @@ function saveState() {
           h: Math.max(80, height),
           data: w.data || {},
         };
+        if (w.type === 'clock') {
+          Logger.log('Saving clock variant:', w.data?.variant);
+        }
       }
     });
     
@@ -556,8 +559,13 @@ function loadState() {
     // Load widgets
     Object.entries(state.widgets).forEach(([id, w]) => {
       if (w.type && Validators.notEmpty(w.type)) {
-        createWidgetEl(w.type, w.x || 0, w.y || 0, w.w || 260, w.h || 180, w.data || {}, id);
+        if (w.type === 'clock') {
+          Logger.log('Loading clock widget:', id, 'variant:', w.data?.variant);
+        }
+        // First, store the widget with all its data
         widgets[id] = w;
+        // Then create the DOM element, which will render with the correct data
+        createWidgetEl(w.type, w.x || 0, w.y || 0, w.w || 260, w.h || 180, w.data || {}, id);
       }
     });
     
@@ -1120,6 +1128,7 @@ function renderClock(container, id) {
   
   try {
     const variant = widgets[id]?.data?.variant || 'digital_24';
+    Logger.log('renderClock: id=' + id + ', variant=' + variant, widgets[id]?.data);
     const hour12 = variant === 'digital_12';
     const isAnalog = variant === 'analog';
     
