@@ -2130,6 +2130,7 @@ function renderTodo(container, id, data) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:4px;flex-wrap:wrap;">
         <span style="font-weight:700;font-size:13px;">✅ To-Do</span>
         <div style="display:flex;gap:4px;align-items:center;">
+          <span class="todo-add" data-todo-add="${id}" style="font-weight:700;color:var(--accent);cursor:pointer;font-size:14px;">+</span>
           <span style="font-size:11px;background:rgba(224,64,251,0.3);padding:2px 8px;border-radius:12px;font-weight:700;">${count}</span>
         </div>
       </div>
@@ -2161,6 +2162,17 @@ function renderTodo(container, id, data) {
     if (input) {
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') todoKeydown(e, id);
+      });
+    }
+    
+    const addBtn = container.querySelector('[data-todo-add]');
+    if (addBtn) {
+      addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const input = container.querySelector('[data-todo-input]');
+        if (input && input.value.trim()) {
+          todoKeydown({ key: 'Enter', target: input }, id);
+        }
       });
     }
     
