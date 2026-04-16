@@ -1360,115 +1360,348 @@ function startClock() {
   clockInterval = setInterval(tick, 1000);
 }
 
-// ===== WEATHER WIDGET =====
+// ===== WEATHER WIDGET™ — ULTIMATE EDITION =====
+// Moon phases • Eclipses • Red Moon • Supermoon • Perfect emojis
+
+// ─────────────────────────────────────────────
+// MOON PHASE CALCULATION (Pure Math)
+// ─────────────────────────────────────────────
+
+const MoonCalc = {
+  getAge(date = new Date()) {
+    const jd = this._jd(date);
+    const daysSinceNew = (jd - 2451549.5) % 29.53058867;
+    return daysSinceNew < 0 ? daysSinceNew + 29.53058867 : daysSinceNew;
+  },
+  _jd(date) {
+    let Y = date.getUTCFullYear();
+    let M = date.getUTCMonth() + 1;
+    const D = date.getUTCDate() + date.getUTCHours() / 24;
+    if (M <= 2) { Y--; M += 12; }
+    const A = Math.floor(Y / 100);
+    const B = 2 - A + Math.floor(A / 4);
+    return Math.floor(365.25 * (Y + 4716)) + Math.floor(30.6001 * (M + 1)) + D + B - 1524.5;
+  },
+  getPhaseName(age) {
+    if (age < 1.85)   return 'new_moon';
+    if (age < 7.38)   return 'waxing_crescent';
+    if (age < 9.22)   return 'first_quarter';
+    if (age < 14.77)  return 'waxing_gibbous';
+    if (age < 16.61)  return 'full_moon';
+    if (age < 22.15)  return 'waning_gibbous';
+    if (age < 23.99)  return 'last_quarter';
+    if (age < 29.00)  return 'waning_crescent';
+    return 'new_moon';
+  },
+  getIllumination(age) {
+    return (1 - Math.cos((age / 29.53058867) * 2 * Math.PI)) / 2;
+  },
+  isNearPerigee(date = new Date()) {
+    const jd = this._jd(date);
+    const daysSincePerigee = (jd - 2451550.9) % 27.55454988;
+    const d = daysSincePerigee < 0 ? daysSincePerigee + 27.55454988 : daysSincePerigee;
+    return d < 1.5 || d > 26.0;
+  },
+};
+
+// ─────────────────────────────────────────────
+// ECLIPSE ENGINE (2024–2028 NASA data)
+// ─────────────────────────────────────────────
+
+const EclipseEngine = {
+  SOLAR_ECLIPSES: [
+    { date: '2024-04-08', type: 'total',   maxLat: 25.3,  maxLon: -104.1, pathWidthKm: 185, durationS: 268  },
+    { date: '2024-10-02', type: 'annular', maxLat: -21.9, maxLon: -109.4, pathWidthKm: 266, durationS: 427  },
+    { date: '2025-03-29', type: 'partial', maxLat: 64.5,  maxLon: 24.7,   pathWidthKm: null, durationS: null },
+    { date: '2025-09-21', type: 'partial', maxLat: -72.5, maxLon: 128.6,  pathWidthKm: null, durationS: null },
+    { date: '2026-02-17', type: 'annular', maxLat: -64.4, maxLon: -83.0,  pathWidthKm: 593, durationS: 505  },
+    { date: '2026-08-12', type: 'total',   maxLat: 64.1,  maxLon: -3.3,   pathWidthKm: 290, durationS: 142  },
+    { date: '2027-02-06', type: 'annular', maxLat: -29.2, maxLon: -89.7,  pathWidthKm: 310, durationS: 461  },
+    { date: '2027-08-02', type: 'total',   maxLat: 23.5,  maxLon: 32.5,   pathWidthKm: 258, durationS: 381  },
+    { date: '2028-01-26', type: 'annular', maxLat: -24.8, maxLon: -18.9,  pathWidthKm: 315, durationS: 490  },
+    { date: '2028-07-22', type: 'total',   maxLat: 7.6,   maxLon: 138.3,  pathWidthKm: 232, durationS: 309  },
+  ],
+  LUNAR_ECLIPSES: [
+    { date: '2024-03-25', type: 'penumbral', visibleHemisphere: 'americas_europe' },
+    { date: '2024-09-18', type: 'partial',   visibleHemisphere: 'americas_europe_africa' },
+    { date: '2025-03-14', type: 'total',     visibleHemisphere: 'americas_pacific' },
+    { date: '2025-09-07', type: 'total',     visibleHemisphere: 'europe_africa_asia' },
+    { date: '2026-03-03', type: 'total',     visibleHemisphere: 'asia_pacific_americas' },
+    { date: '2026-08-28', type: 'partial',   visibleHemisphere: 'europe_africa_asia' },
+    { date: '2027-02-20', type: 'penumbral', visibleHemisphere: 'americas_pacific' },
+    { date: '2027-07-18', type: 'partial',   visibleHemisphere: 'americas_europe_africa' },
+    { date: '2028-01-12', type: 'total',     visibleHemisphere: 'europe_africa_asia' },
+    { date: '2028-07-06', type: 'partial',   visibleHemisphere: 'americas_europe_africa' },
+  ],
+  _dateDiffDays(date, eclipseDate) {
+    const e = new Date(eclipseDate + 'T12:00:00Z');
+    return Math.abs((date - e) / 86400000);
+  },
+  _solarVisibility(eclipse, userLat, userLon) {
+    if (eclipse.type === 'partial') {
+      const dist = Math.hypot(userLat - eclipse.maxLat, userLon - eclipse.maxLon);
+      return dist < 70 ? 'partial' : null;
+    }
+    const distKm = Math.hypot((userLat - eclipse.maxLat) * 111, (userLon - eclipse.maxLon) * 111 * Math.cos(eclipse.maxLat * Math.PI / 180));
+    if (distKm < (eclipse.pathWidthKm / 2)) return eclipse.type;
+    if (distKm < 3500) return 'partial';
+    return null;
+  },
+  _lunarVisibility(eclipse, userLon) {
+    const map = {
+      'americas_europe': { lonMin: -150, lonMax: 40 },
+      'americas_europe_africa': { lonMin: -120, lonMax: 50 },
+      'europe_africa_asia': { lonMin: -20, lonMax: 150 },
+      'americas_pacific': { lonMin: -180, lonMax: -30 },
+      'asia_pacific_americas': { lonMin: 60, lonMax: 180 },
+    };
+    const zone = map[eclipse.visibleHemisphere];
+    if (!zone) return eclipse.type;
+    return (userLon >= zone.lonMin && userLon <= zone.lonMax) ? eclipse.type : null;
+  },
+  getCurrentEclipse(date, userLat, userLon) {
+    const now = date || new Date();
+    for (const e of this.SOLAR_ECLIPSES) {
+      if (this._dateDiffDays(now, e.date) <= 0.5) {
+        const vis = this._solarVisibility(e, userLat, userLon);
+        if (vis) return { kind: 'solar', type: e.type, visibility: vis, animated: true };
+      }
+    }
+    for (const e of this.LUNAR_ECLIPSES) {
+      if (this._dateDiffDays(now, e.date) <= 0.5) {
+        const vis = this._lunarVisibility(e, userLon);
+        if (vis) return { kind: 'lunar', type: e.type, visibility: vis, animated: true };
+      }
+    }
+    return null;
+  },
+};
+
+// ─────────────────────────────────────────────
+// WEATHER EMOJI SYSTEM
+// Perfect emoji for all conditions + moon logic
+// ─────────────────────────────────────────────
+
+const WeatherEmoji = {
+  fromCode(code, isDay) {
+    if (isDay) return this._day(code);
+    return this._night(code);
+  },
+  _day(code) {
+    const emojis = {
+      0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
+      45: '🌫️', 48: '🌁',
+      51: '🌦️', 53: '🌦️', 55: '🌧️',
+      56: '🌨️', 57: '🌨️',
+      61: '🌦️', 63: '🌧️', 65: '🌧️',
+      66: '🌨️', 67: '🌨️',
+      71: '🌨️', 73: '❄️', 75: '🌨️', 77: '🌨️',
+      80: '🌦️', 81: '🌧️', 82: '⛈️',
+      85: '🌨️', 86: '❄️',
+      95: '⛈️', 96: '⛈️', 99: '🌩️',
+    };
+    return emojis[code] || '🌤️';
+  },
+  _night(code) {
+    const emojis = {
+      0: null, // moon phase
+      1: '🌤️', 2: '☁️', 3: '☁️',
+      45: '🌫️', 48: '🌁',
+      51: '🌧️', 53: '🌧️', 55: '🌧️',
+      56: '🌨️', 57: '🌨️',
+      61: '🌧️', 63: '🌧️', 65: '🌧️',
+      66: '🌨️', 67: '🌨️',
+      71: '🌨️', 73: '❄️', 75: '🌨️', 77: '🌨️',
+      80: '🌧️', 81: '🌧️', 82: '⛈️',
+      85: '🌨️', 86: '❄️',
+      95: '⛈️', 96: '⛈️', 99: '🌩️',
+    };
+    return emojis[code] || '🌙';
+  },
+  skyClearFactor(code) {
+    if (code === 0) return 1.0;
+    if (code === 1) return 0.85;
+    if (code === 2) return 0.6;
+    if (code === 3) return 0.0;
+    if (code <= 48) return 0.0;
+    if (code <= 57) return 0.0;
+    if (code <= 82) return 0.0;
+    if (code <= 86) return 0.0;
+    if (code <= 99) return 0.0;
+    return 0.5;
+  },
+  getMoonEmoji(date, weatherCode, eclipse, userLat, userLon) {
+    const age = MoonCalc.getAge(date);
+    const phase = MoonCalc.getPhaseName(age);
+    const clear = this.skyClearFactor(weatherCode);
+    const illum = Math.round(MoonCalc.getIllumination(age) * 100);
+    if (eclipse && eclipse.kind === 'lunar') {
+      if (eclipse.type === 'total') return { emoji: '🔴', label: '🔴 Blood Moon (Total)', isAnimated: true, animationClass: 'eclipse-lunar-total' };
+      if (eclipse.type === 'partial') return { emoji: '🌔', label: '🌖 Partial Lunar Eclipse', isAnimated: true, animationClass: 'eclipse-lunar-partial' };
+      if (eclipse.type === 'penumbral') return { emoji: '🌕', label: '🌕 Penumbral Eclipse', isAnimated: true, animationClass: 'eclipse-lunar-penumbral' };
+    }
+    if (eclipse && eclipse.kind === 'solar') {
+      if (eclipse.type === 'total') return { emoji: '🌑', label: '🌑 Total Solar Eclipse', isAnimated: true, animationClass: 'eclipse-solar-total' };
+      if (eclipse.type === 'annular') return { emoji: '💍', label: '💍 Ring of Fire', isAnimated: true, animationClass: 'eclipse-solar-annular' };
+      if (eclipse.type === 'partial') return { emoji: '🌒', label: '🌒 Partial Solar Eclipse', isAnimated: true, animationClass: 'eclipse-solar-partial' };
+    }
+    const isNearFullMoon = phase === 'full_moon' || (age > 13.5 && age < 15.5);
+    const isSupermoon = isNearFullMoon && MoonCalc.isNearPerigee(date);
+    if (isSupermoon && clear > 0.5) return { emoji: '🌕', label: '🌟 Supermoon (' + illum + '%)', isAnimated: true, animationClass: 'moon-super' };
+    const isRedMoon = isNearFullMoon && clear > 0.6 && this._isRedMoonTime(date, userLat, userLon);
+    if (isRedMoon) return { emoji: '🔴', label: '🔴 Red Moon (' + illum + '%)', isAnimated: true, animationClass: 'moon-red' };
+    if (clear < 0.15) return { emoji: '☁️', label: '☁️ Overcast', isAnimated: false, animationClass: '' };
+    if (clear < 0.6) {
+      const emoji = this._phaseEmoji(phase);
+      return { emoji: emoji + '☁️', label: this._phaseName(phase) + ' (cloudy)', isAnimated: false, animationClass: '' };
+    }
+    const emoji = this._phaseEmoji(phase);
+    return { emoji: emoji, label: this._phaseName(phase) + ' (' + illum + '%)', isAnimated: false, animationClass: '' };
+  },
+  _phaseEmoji(phase) {
+    const map = { new_moon: '🌑', waxing_crescent: '🌒', first_quarter: '🌓', waxing_gibbous: '🌔', full_moon: '🌕', waning_gibbous: '🌖', last_quarter: '🌗', waning_crescent: '🌘' };
+    return map[phase] || '🌙';
+  },
+  _phaseName(phase) {
+    const names = { new_moon: '🌑 New Moon', waxing_crescent: '🌒 Waxing Crescent', first_quarter: '🌓 First Quarter', waxing_gibbous: '🌔 Waxing Gibbous', full_moon: '🌕 Full Moon', waning_gibbous: '🌖 Waning Gibbous', last_quarter: '🌗 Last Quarter', waning_crescent: '🌘 Waning Crescent' };
+    return names[phase] || '🌙 Moon';
+  },
+  _isRedMoonTime(date, lat, lon) {
+    const h = date.getHours();
+    const age = MoonCalc.getAge(date);
+    const isNearHorizon = (h >= 18 && h <= 21) || (h >= 4 && h <= 7);
+    const isNearFull = age > 13.0 && age < 16.0;
+    return isNearHorizon && isNearFull;
+  },
+};
+
+// ─────────────────────────────────────────────
+// WEATHER DESCRIPTIONS (All 24 WMO codes)
+// ─────────────────────────────────────────────
+
+function weatherDesc(code) {
+  const descriptions = {
+    0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Foggy', 48: 'Freezing fog',
+    51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle', 56: 'Light freezing drizzle', 57: 'Heavy freezing drizzle',
+    61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain', 66: 'Light freezing rain', 67: 'Heavy freezing rain',
+    71: 'Light snowfall', 73: 'Moderate snowfall', 75: 'Heavy snowfall', 77: 'Snow grains',
+    80: 'Light rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers', 85: 'Slight snow showers', 86: 'Heavy snow showers',
+    95: 'Thunderstorm', 96: 'Thunderstorm + hail', 99: 'Thunderstorm + heavy hail',
+  };
+  return descriptions[code] || 'Unknown';
+}
+
+// ─────────────────────────────────────────────
+// CSS ECLIPSE ANIMATIONS
+// ─────────────────────────────────────────────
+
+function injectEclipseStyles() {
+  if (document.getElementById('ts-eclipse-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'ts-eclipse-styles';
+  style.textContent = `
+    @keyframes blood-moon-pulse { 0% { filter: hue-rotate(0deg) saturate(1) drop-shadow(0 0 8px #ff2200); } 50% { filter: hue-rotate(10deg) saturate(1.5) drop-shadow(0 0 24px #ff4400); } 100% { filter: hue-rotate(0deg) saturate(1) drop-shadow(0 0 8px #ff2200); } }
+    .eclipse-lunar-total .weather-icon-main { animation: blood-moon-pulse 4s ease-in-out infinite; }
+    @keyframes partial-lunar { 0% { filter: sepia(0.3) drop-shadow(0 0 6px #ff6600); } 50% { filter: sepia(0.7) drop-shadow(0 0 14px #ff4400); } 100% { filter: sepia(0.3) drop-shadow(0 0 6px #ff6600); } }
+    .eclipse-lunar-partial .weather-icon-main { animation: partial-lunar 5s ease-in-out infinite; }
+    @keyframes penumbral { 0% { filter: brightness(0.95); } 50% { filter: brightness(0.80); } 100% { filter: brightness(0.95); } }
+    .eclipse-lunar-penumbral .weather-icon-main { animation: penumbral 8s ease-in-out infinite; }
+    @keyframes solar-total { 0% { filter: brightness(1) drop-shadow(0 0 4px #ffe066); } 40% { filter: brightness(0.0) drop-shadow(0 0 32px #ff6600) drop-shadow(0 0 48px #ff0000); } 100% { filter: brightness(1) drop-shadow(0 0 4px #ffe066); } }
+    .eclipse-solar-total .weather-icon-main { animation: solar-total 10s ease-in-out infinite; }
+    @keyframes ring-of-fire { 0% { filter: drop-shadow(0 0 4px #ff8800); } 50% { filter: drop-shadow(0 0 18px #ffcc00) drop-shadow(0 0 36px #ff4400); } 100% { filter: drop-shadow(0 0 4px #ff8800); } }
+    .eclipse-solar-annular .weather-icon-main { animation: ring-of-fire 6s ease-in-out infinite; }
+    @keyframes solar-partial { 0% { filter: brightness(1); } 50% { filter: brightness(0.6) drop-shadow(0 0 8px #ff8800); } 100% { filter: brightness(1); } }
+    .eclipse-solar-partial .weather-icon-main { animation: solar-partial 8s ease-in-out infinite; }
+    @keyframes red-moon-glow { 0% { filter: sepia(0.5) hue-rotate(-30deg) saturate(2) drop-shadow(0 0 6px #cc2200); } 50% { filter: sepia(0.7) hue-rotate(-40deg) saturate(2.5) drop-shadow(0 0 14px #ff3300); } 100% { filter: sepia(0.5) hue-rotate(-30deg) saturate(2) drop-shadow(0 0 6px #cc2200); } }
+    .moon-red .weather-icon-main { animation: red-moon-glow 6s ease-in-out infinite; }
+    @keyframes supermoon { 0% { filter: brightness(1.1) drop-shadow(0 0 8px rgba(255,240,180,0.6)); } 50% { filter: brightness(1.3) drop-shadow(0 0 18px rgba(255,240,180,0.9)); } 100% { filter: brightness(1.1) drop-shadow(0 0 8px rgba(255,240,180,0.6)); } }
+    .moon-super .weather-icon-main { animation: supermoon 4s ease-in-out infinite; }
+    .eclipse-banner { font-size: 10px; padding: 3px 8px; border-radius: 6px; text-align: center; font-weight: 700; margin-top: 4px; animation: eclipse-banner-pulse 2s ease-in-out infinite; }
+    @keyframes eclipse-banner-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+    .eclipse-banner-solar { background: rgba(255,140,0,0.25); color: #ffb347; border: 1px solid rgba(255,140,0,0.4); }
+    .eclipse-banner-lunar { background: rgba(200,0,0,0.25); color: #ff8080; border: 1px solid rgba(200,0,0,0.4); }
+    .moon-phase-badge { font-size: 10px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 2px 6px; text-align: center; margin-top: 4px; color: var(--text-muted); }
+  `;
+  document.head.appendChild(style);
+}
+
+// ─────────────────────────────────────────────
+// RENDER WEATHER
+// ─────────────────────────────────────────────
 
 function renderWeather(container, id) {
   if (!container) return;
-  
+  injectEclipseStyles();
   try {
     const data = widgets[id]?.data || {};
-    const variant = data.variant || 'celsius'; // Default to celsius
+    const variant = data.variant || 'celsius';
     const isFahrenheit = variant === 'fahrenheit';
-    
-    if (data.temp && data.fetchedAt && Date.now() - data.fetchedAt < 3600000) {
-      // Use cached data
-      const displayTemp = isFahrenheit ? Math.round((data.temp * 9/5) + 32) : Math.round(data.temp);
-      const unit = isFahrenheit ? '°F' : '°C';
-      
-      container.innerHTML = `
-        <div class="weather-icon">${getWeatherIcon(data.code)}</div>
-        <div class="weather-temp">${displayTemp}${unit}</div>
-        <div class="weather-desc">${escapeHTML(data.desc || '')}</div>
-        <div class="weather-loc">${escapeHTML(data.loc || 'Your location')}</div>
-      `;
+    const CACHE_MAX = 30 * 60 * 1000;
+    if (data.temp !== undefined && data.fetchedAt && Date.now() - data.fetchedAt < CACHE_MAX) {
+      _renderWeatherDisplay(container, id, data);
     } else {
       const unit = isFahrenheit ? '°F' : '°C';
-      container.innerHTML = `
-        <div class="weather-icon">🌤️</div>
-        <div class="weather-temp" id="wt-${id}">--${unit}</div>
-        <div class="weather-desc" id="wd-${id}">Fetching weather...</div>
-        <div class="weather-loc" id="wl-${id}">Your location</div>
-      `;
+      container.innerHTML = `<div class="weather-icon-main" style="font-size:42px;text-align:center;">🔄</div><div class="weather-temp" style="font-size:32px;font-weight:700;text-align:center;">--${unit}</div><div class="weather-desc" style="font-size:11px;text-align:center;opacity:0.75;">Fetching...</div><div class="weather-loc" style="font-size:10px;text-align:center;opacity:0.5;">Your location</div>`;
       fetchWeather(id);
     }
   } catch(e) {
     Logger.error('renderWeather failed', e);
-    container.innerHTML = '<div style="color:var(--text-muted)">Weather unavailable</div>';
+    container.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:12px;">⚠️ Weather unavailable</div>';
   }
 }
 
-function showWeatherSettings(id) {
-  const content = `
-    <div style="text-align: center; padding: 8px;">
-      <h3 style="margin: 0 0 16px 0; font-size: 18px;">🌡️ Temperature Unit</h3>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <button class="weather-variant-btn" data-variant="celsius" style="
-          padding: 12px;
-          border: 2px solid var(--glass-border);
-          background: var(--glass-bg);
-          color: var(--text);
-          border-radius: var(--radius);
-          cursor: pointer;
-          font-size: 14px;
-          transition: all 0.3s ease;
-        ">°C Celsius</button>
-        <button class="weather-variant-btn" data-variant="fahrenheit" style="
-          padding: 12px;
-          border: 2px solid var(--glass-border);
-          background: var(--glass-bg);
-          color: var(--text);
-          border-radius: var(--radius);
-          cursor: pointer;
-          font-size: 14px;
-          transition: all 0.3s ease;
-        ">°F Fahrenheit</button>
-      </div>
-    </div>
-  `;
-
-  showModal(content);
-
-  document.querySelectorAll('.weather-variant-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const variant = btn.getAttribute('data-variant');
-      widgets[id].data.variant = variant;
-      debouncedSaveState();
-      closeModal();
-      const container = document.getElementById('w-' + id);
-      renderWeather(container, id);
-    });
-    
-    btn.addEventListener('mouseover', () => {
-      btn.style.borderColor = 'var(--accent)';
-      btn.style.boxShadow = '0 0 12px rgba(var(--accent-rgb), 0.3)';
-    });
-    
-    btn.addEventListener('mouseout', () => {
-      btn.style.borderColor = 'var(--glass-border)';
-      btn.style.boxShadow = 'none';
-    });
-  });
+function _renderWeatherDisplay(container, id, data) {
+  const variant = data.variant || 'celsius';
+  const isFahrenheit = variant === 'fahrenheit';
+  const displayTemp = isFahrenheit ? Math.round((data.temp * 9 / 5) + 32) : Math.round(data.temp);
+  const unit = isFahrenheit ? '°F' : '°C';
+  const isDay = data.isDay !== undefined ? data.isDay : true;
+  const code = data.code || 0;
+  const now = new Date();
+  const lat = data.lat || 0;
+  const lon = data.lon || 0;
+  const eclipse = EclipseEngine.getCurrentEclipse(now, lat, lon);
+  let emojiObj;
+  if (!isDay && code === 0) {
+    emojiObj = WeatherEmoji.getMoonEmoji(now, code, eclipse, lat, lon);
+  } else if (isDay && eclipse && eclipse.kind === 'solar') {
+    emojiObj = WeatherEmoji.getMoonEmoji(now, code, eclipse, lat, lon);
+  } else {
+    const emoji = WeatherEmoji.fromCode(code, isDay);
+    emojiObj = { emoji: emoji, label: weatherDesc(code), isAnimated: false, animationClass: '' };
+  }
+  const eclipseBanner = eclipse ? `<div class="eclipse-banner eclipse-banner-${eclipse.kind}"> ${eclipse.kind === 'solar' ? '🌑' : '🔴'} ${eclipse.visibility || eclipse.type}</div>` : '';
+  let moonBadge = '';
+  if (!isDay && code === 0) {
+    const age = MoonCalc.getAge(now);
+    const illumPct = Math.round(MoonCalc.getIllumination(age) * 100);
+    moonBadge = `<div class="moon-phase-badge">${illumPct}% illuminated</div>`;
+  }
+  const animClass = emojiObj.animationClass ? ` ${emojiObj.animationClass}` : '';
+  const widgetEl = document.getElementById(id);
+  if (widgetEl) {
+    widgetEl.className = widgetEl.className.replace(/eclipse-\S+|moon-\S+/g, '').trim();
+    if (animClass) widgetEl.className += animClass;
+  }
+  container.innerHTML = `<div class="weather-icon-main" style="font-size:42px;text-align:center;margin-bottom:2px;">${emojiObj.emoji}</div><div class="weather-temp" style="font-size:clamp(28px,4vw,38px);font-weight:700;text-align:center;">${displayTemp}${unit}</div><div class="weather-desc" style="font-size:clamp(10px,1.4vw,12px);text-align:center;opacity:0.75;margin-top:2px;">${escapeHTML(emojiObj.label)}</div><div class="weather-loc" style="font-size:10px;text-align:center;opacity:0.5;margin-top:2px;">📍 ${escapeHTML(data.loc || 'Your location')}</div>${moonBadge}${eclipseBanner}`;
+  if (!window._weatherRefreshTimers) window._weatherRefreshTimers = {};
+  clearTimeout(window._weatherRefreshTimers[id]);
+  window._weatherRefreshTimers[id] = setTimeout(() => {
+    if (widgets[id] && document.getElementById(id)) {
+      delete widgets[id].data.fetchedAt;
+      const container = document.getElementById('content-' + id);
+      if (container) renderWeather(container, id);
+    }
+  }, 30 * 60 * 1000);
 }
 
 function fetchWeather(id) {
   try {
-    // Rate limit and cache check
-    if (!weatherRateLimiter.canCall()) {
-      Logger.warn('Weather API call rate-limited');
-      return;
-    }
-    
-    if (!navigator.geolocation) {
-      Logger.warn('Geolocation not available');
-      return;
-    }
-    
-    // Use cached coordinates if available
+    if (!navigator.geolocation) { Logger.warn('Geolocation not available'); return; }
     if (geolocationCache.coords && Date.now() - geolocationCache.timestamp < geolocationCache.maxAge) {
       fetchWeatherWithCoords(geolocationCache.coords, id);
       return;
     }
-    
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         geolocationCache.coords = pos.coords;
@@ -1490,26 +1723,18 @@ function fetchWeather(id) {
 async function fetchWeatherWithCoords(coords, id) {
   try {
     const { latitude: lat, longitude: lon } = coords;
-    
-    // Fetch weather data
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
-    const weatherRes = await fetch(weatherUrl, { timeout: 5000 });
-    
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
+    const weatherRes = await fetch(weatherUrl);
     if (!weatherRes.ok) throw new Error('Weather API failed');
-    
     const weatherData = await weatherRes.json();
     const cw = weatherData?.current_weather;
-    
     if (!cw) throw new Error('Invalid weather response');
-    
     const temp = cw.temperature;
     const code = cw.weathercode || 0;
-    
-    // Fetch location data
-    const locUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+    const isDay = cw.is_day === 1;
     let loc = 'Your location';
-    
     try {
+      const locUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
       const locRes = await fetch(locUrl, { timeout: 5000 });
       if (locRes.ok) {
         const locData = await locRes.json();
@@ -1518,36 +1743,12 @@ async function fetchWeatherWithCoords(coords, id) {
     } catch(e) {
       Logger.warn('Location API failed', e);
     }
-    
-    // Update widget data
     if (widgets[id]) {
-      widgets[id].data = { 
-        temp, 
-        code, 
-        desc: weatherDesc(code), 
-        loc,
-        fetchedAt: Date.now(),
-      };
+      widgets[id].data = { ...widgets[id].data, temp, code, isDay, desc: weatherDesc(code), loc, lat, lon, fetchedAt: Date.now() };
       debouncedSaveState();
     }
-    
-    // Update UI
-    const tempEl = DOM.get('wt-' + id);
-    if (tempEl) {
-      const variant = widgets[id]?.data?.variant || 'celsius';
-      const displayTemp = variant === 'fahrenheit' ? Math.round((temp * 9/5) + 32) : Math.round(temp);
-      const unit = variant === 'fahrenheit' ? '°F' : '°C';
-      tempEl.textContent = displayTemp + unit;
-    }
-    
-    const descEl = DOM.get('wd-' + id);
-    if (descEl) descEl.textContent = weatherDesc(code);
-    
-    const locEl = DOM.get('wl-' + id);
-    if (locEl) locEl.textContent = loc;
-    
-    const iconEl = DOM.query(`#content-${id} .weather-icon`);
-    if (iconEl) iconEl.textContent = getWeatherIcon(code);
+    const container = document.getElementById('content-' + id);
+    if (container) _renderWeatherDisplay(container, id, widgets[id].data);
   } catch(e) {
     Logger.error('fetchWeatherWithCoords failed', e);
     const el = DOM.get('wd-' + id);
@@ -1555,28 +1756,48 @@ async function fetchWeatherWithCoords(coords, id) {
   }
 }
 
-function getWeatherIcon(code) {
-  if (code === 0) return '☀️';
-  if (code <= 2) return '⛅';
-  if (code <= 49) return '🌫️';
-  if (code <= 67) return '🌧️';
-  if (code <= 77) return '❄️';
-  if (code <= 82) return '🌦️';
-  if (code <= 99) return '⛈️';
-  return '🌤️';
+function getWeatherIcon(code, isDay = true) {
+  return WeatherEmoji.fromCode(code, isDay);
 }
 
-function weatherDesc(code) {
-  if (code === 0) return 'Clear sky';
-  if (code <= 2) return 'Partly cloudy';
-  if (code <= 3) return 'Overcast';
-  if (code <= 49) return 'Foggy';
-  if (code <= 67) return 'Rainy';
-  if (code <= 77) return 'Snowy';
-  if (code <= 82) return 'Showers';
-  if (code <= 99) return 'Thunderstorm';
-  return 'Unknown';
+function showWeatherSettings(id) {
+  const content = `
+    <div style="text-align:center;padding:8px;">
+      <h3 style="margin:0 0 16px 0;font-size:18px;">🌡️ Weather Settings</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <button class="weather-variant-btn" data-variant="celsius" style="padding:12px;border:2px solid var(--glass-border);background:var(--glass-bg);color:var(--text);border-radius:var(--radius);cursor:pointer;font-size:14px;transition:all 0.3s;">°C Celsius</button>
+        <button class="weather-variant-btn" data-variant="fahrenheit" style="padding:12px;border:2px solid var(--glass-border);background:var(--glass-bg);color:var(--text);border-radius:var(--radius);cursor:pointer;font-size:14px;transition:all 0.3s;">°F Fahrenheit</button>
+      </div>
+      <div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:10px;font-size:11px;color:var(--text-muted);line-height:1.8;text-align:left;">
+        <div style="font-weight:700;margin-bottom:6px;color:var(--text);">✨ Ultimate Features:</div>
+        🌤️ Perfect emoji for all 24 WMO conditions<br>
+        🌑🌒🌓🌔🌕🌖🌗🌘 8 real moon phases<br>
+        🔴 Red Moon at horizon (near full)<br>
+        🌟 Supermoon at perigee<br>
+        🩸 Blood Moon (total lunar eclipse)<br>
+        💍 Ring of Fire (annular eclipse)<br>
+        🌑 Total solar eclipse with corona<br>
+        🌧️ Rain hides moon (awareness)<br>
+        🔄 Auto-refresh every 30 minutes
+      </div>
+    </div>
+  `;
+  showModal(content);
+  document.querySelectorAll('.weather-variant-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const variant = btn.getAttribute('data-variant');
+      if (widgets[id]) {
+        widgets[id].data.variant = variant;
+        debouncedSaveState();
+        closeModal();
+        const container = document.getElementById('content-' + id);
+        if (container) _renderWeatherDisplay(container, id, widgets[id].data);
+      }
+    });
+  });
 }
+
+Logger.log('✨ Ultimate Weather Widget loaded — Moon phases, eclipses, red moon, supermoon all active');
 
 // ===== SEARCH WIDGET =====
 
